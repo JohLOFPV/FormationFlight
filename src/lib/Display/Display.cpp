@@ -10,9 +10,15 @@
 #include "../MSP/MSPManager.h"
 #include "../Cryptography/CryptoManager.h"
 #include "../Statistics/StatsManager.h"
+#include "../OSD/max7456.h"
 
 #ifdef HAS_OLED
 SSD1306 display(OLED_ADDRESS, OLED_SDA, OLED_SCL);
+#endif
+
+#ifdef OSD
+Max7456       osd;
+float dirTest = 0.0;
 #endif
 
 void display_init()
@@ -38,6 +44,32 @@ void display_draw_status(system_t *sys)
     display.clear();
     int j = 0;
     int line;
+
+
+
+#ifdef OSD 
+    uint8_t idx = 1;
+    dirTest = dirTest + 5.5;
+    if(dirTest >= 360) dirTest = 0;
+
+    const peer_t *peer = PeerManager::getSingleton()->getPeer(idx);
+    int i = constrain(sys->display_page - 3, 0, cfg.lora_nodes - 1);
+    bool iscurrent = (i + 1 == curr.id);
+
+    osd.print(peer_slotname[idx + 1], 14, 3, false, false);
+    osd.print((int)peer->distance, 13, 4, 4, 0, false, true);
+    //osd.print((int)peer->direction, 13, 5, 3, 0, false, true);
+    osd.print((int)peer->relalt, 13, 6, 4, 0, false, true);
+
+    if (peer->lq == 0)      osd.printMax7456Char(0xCA, 15, 3, true, true);
+    else if (peer->lq > 0)  osd.printMax7456Char(0xCA, 15, 3, false, false);
+
+    //int dir = (peer->direction - 22) / 16;
+    int dir = (dirTest) / 22;
+    if(dir > 15) dir = 15;
+    osd.printMax7456Char(0xA0 + dir, 13, 3, false, false);
+    osd.print((int)dirTest, 13, 5, 3, 0, false, true);
+#endif
 
     if (sys->display_page == 0)
     {
@@ -284,7 +316,7 @@ void display_draw_status(system_t *sys)
                 display.setTextAlignment(TEXT_ALIGN_RIGHT);
                 display.drawString(128, 54, "B " + String(peer->direction) + "°");
                 display.drawString(128, 44, "D " + String((int)peer->distance) + "m");
-                display.setTextAlignment(TEXT_ALIGN_LEFT);
+                display.setTextAlignment(TEXT_ALIGN_LEFT);               
             }
 
             if (iscurrent)
@@ -326,6 +358,20 @@ void display_draw_intro()
 
 void display_draw_startup()
 {
+
+#ifdef OSD 
+    DBGLN("[main] OSDManager::start OSD");
+    osd.init(OSD_PIN_CS);
+
+    osd.activateOSD(true);
+
+
+    osd.print("       ID:", 2, 3);
+    osd.print(" Distance:", 2, 4);
+    osd.print("Direction:", 2, 5);
+    osd.print("   RelAlt:", 2, 6);
+#endif
+
 #ifdef HAS_OLED
     display.clear();
     display.setFont(ArialMT_Plain_10);
